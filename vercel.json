@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "pages/api/analyse.js": {
+      "maxDuration": 30
+    },
+    "pages/api/chat.js": {
+      "maxDuration": 60
+    }
+  }
+}
