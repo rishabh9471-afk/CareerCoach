@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { IncomingForm } from "formidable";
+import formidable from "formidable";
 import fs from "fs";
 
 export const config = {
@@ -15,11 +15,9 @@ PERSONAS you serve:
 - Grow (4-6 yrs in, solid performer, wants to level up in current field)
 - Recent Graduate (<=1 yr experience, overwhelmed by options)
 
-CONVERSATION PHASES:
-
 PHASE 1 — OPENER (after reading resume):
-- Do NOT say "I've reviewed your resume" or generic openers.
-- Name ONE specific tension or opportunity you spotted. Be incisive.
+- Do NOT say "I've reviewed your resume" or use generic openers.
+- Name ONE specific tension or opportunity you spotted. Be incisive and specific.
 - Ask one sharp question to understand what they want (pivot, growth, or clarity).
 - Max 3 sentences total.
 
@@ -52,14 +50,12 @@ PHASE 2 — PATH CARDS (after understanding their goal):
 <<<END_PATHS_JSON>>>
 
 PHASE 3 — ALTERNATIVE PATHS (if user asks for different ones):
-- Output a new set of 3 ENTIRELY different roles.
-- Use the same JSON format.
-- Max 2 rounds of path cards total.
+- Output 3 ENTIRELY different roles using the same JSON format.
+- Max 2 rounds of path cards total (6 paths across both rounds).
 
 PHASE 4 — ACTION PLAN (after user selects a path):
 - Give a concrete 3-step plan for the next 30 days, specific to their background.
-- Be direct, actionable, encouraging. Max 150 words. No JSON.
-- End the coaching session warmly.
+- Be direct, actionable, encouraging. Max 150 words. No JSON. End warmly.
 
 RULES:
 - Keep all non-JSON responses to 3-5 sentences max.
@@ -71,7 +67,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const form = new IncomingForm({ maxFileSize: 5 * 1024 * 1024 });
+  const form = formidable({ maxFileSize: 5 * 1024 * 1024 });
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -92,7 +88,10 @@ export default async function handler(req, res) {
       const base64Data = fileData.toString("base64");
 
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: SYSTEM_PROMPT,
+      });
 
       const result = await model.generateContent({
         contents: [
@@ -106,25 +105,16 @@ export default async function handler(req, res) {
                 },
               },
               {
-                text: "Analyse this resume and open the career coaching conversation. Follow the system instructions exactly.",
+                text: "Analyse this resume and open the career coaching conversation. Follow your instructions exactly.",
               },
             ],
           },
         ],
-        systemInstruction: SYSTEM_PROMPT,
         generationConfig: { maxOutputTokens: 600, temperature: 0.7 },
       });
 
       const text = result.response.text();
-
-      // Return the resume text summary for client-side history
-      // Extract text content from PDF for conversation context
-      const resumeSummary = `[Resume uploaded and analysed]`;
-
-      res.status(200).json({
-        message: text,
-        resumeContext: resumeSummary,
-      });
+      res.status(200).json({ message: text });
     } catch (error) {
       console.error("Gemini API error:", error);
       res.status(500).json({ error: error.message || "Failed to analyse resume." });
